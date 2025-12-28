@@ -1,0 +1,42 @@
+
+> scanner-app@0.1.0 build
+> next build
+
+   Creating an optimized production build ...
+ 笨・Compiled successfully
+   Linting and checking validity of types ...
+
+   We detected TypeScript in your project and reconfigured your tsconfig.json file for you. Strict-mode is set to false by default.
+   The following mandatory changes were made to your tsconfig.json:
+
+   	- jsx was set to preserve (next.js implements its own optimized jsx transform)
+
+   Collecting page data ...
+   Generating static pages (0/5) ...
+(node:18048) ExperimentalWarning: buffer.Blob is an experimental feature. This feature could change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+   Generating static pages (1/5) 
+
+   Generating static pages (2/5) 
+
+   Generating static pages (3/5) 
+failed to asynchronously prepare wasm: both async and sync fetching of the wasm failed
+Aborted(both async and sync fetching of the wasm failed)
+
+ 笨・Generating static pages (5/5) 
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+笏・笳・/                                    58.4 kB         139 kB
+笏・笳・/_not-found                          882 B          81.3 kB
++ First Load JS shared by all            80.4 kB
+  笏・chunks/472-ec13c382ff7f6ac8.js       27.5 kB
+  笏・chunks/fd9d1056-dfe2c166e2397ca0.js  50.9 kB
+  笏・chunks/main-app-26fc506c84015ec2.js  230 B
+  笏・chunks/webpack-f7963091c93d32ac.js   1.73 kB
+
+
+笳・ (Static)  automatically rendered as static HTML (uses no initial props)
+

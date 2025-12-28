@@ -1,0 +1,13 @@
+
+> scanner-app@0.1.0 build
+> next build
+
+
+> Build error occurred
+Error: Configuring Next.js via 'next.config.ts' is not supported. Please replace the file with 'next.config.js' or 'next.config.mjs'.
+    at loadConfig (C:\Users\j-hori\繧｢繝励Μ\scanner-app\node_modules\next\dist\server\config.js:758:19)
+    at async Span.traceAsyncFn (C:\Users\j-hori\繧｢繝励Μ\scanner-app\node_modules\next\dist\trace\trace.js:105:20)
+    at async C:\Users\j-hori\繧｢繝励Μ\scanner-app\node_modules\next\dist\build\index.js:190:28
+    at async Span.traceAsyncFn (C:\Users\j-hori\繧｢繝励Μ\scanner-app\node_modules\next\dist\trace\trace.js:105:20)
+    at async build (C:\Users\j-hori\繧｢繝励Μ\scanner-app\node_modules\next\dist\build\index.js:185:29)
+    at async main (C:\Users\j-hori\繧｢繝励Μ\scanner-app\node_modules\next\dist\bin\next:157:5)

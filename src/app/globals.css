@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Natural / Mountain Palette */
+  --background: #1a2e1a; /* Deep Forest Green */
+  --foreground: #e0e7e0; /* Mist White */
+  
+  --card-bg: rgba(255, 255, 255, 0.1);
+  --card-border: rgba(255, 255, 255, 0.2);
+  
+  --accent-primary: #4caf50; /* Fresh Green */
+  --accent-secondary: #ffb74d; /* Sunset Orange */
+  
+  --status-entered: #66bb6a;
+  --status-exited: #90a4ae;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  background-image: 
+    radial-gradient(at 0% 0%, hsla(120,30%,20%,1) 0, transparent 50%), 
+    radial-gradient(at 100% 100%, hsla(200,30%,25%,1) 0, transparent 50%);
+  background-attachment: fixed;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply backdrop-blur-md bg-white/10 border border-white/20 shadow-xl;
+  }
+  
+  .text-glow {
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+  }
+}
