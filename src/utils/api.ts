@@ -54,3 +54,17 @@ export const recordUserAction = async (email: string, action: 'entry' | 'exit'):
         return { success: false, message: "Network Error" };
     }
 };
+// Fetch daily report for a specific date (YYYY-MM-DD or YYYY/MM/DD)
+export const fetchDailyReport = async (dateStr: string): Promise<{ success: boolean; data?: any[]; message?: string }> => {
+    try {
+        // GAS expects 'reportDate' parameter
+        const response = await fetch(`${API_URL}?reportDate=${encodeURIComponent(dateStr)}`, {
+            method: "GET",
+            mode: "cors",
+        });
+        return await response.json();
+    } catch (error) {
+        console.error("Report Fetch Error:", error);
+        return { success: false, message: "Network Error" };
+    }
+};

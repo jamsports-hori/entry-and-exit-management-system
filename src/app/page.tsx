@@ -1,15 +1,33 @@
-"use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { QRScanner } from "../components/Scanner";
-import { fetchUserData, recordUserAction, UserData } from "../utils/api";
-import { Mountain, CheckCircle2, TreePine, History, AlertCircle, Loader2, User, Shield, Tent } from "lucide-react";
+import { fetchUserData, recordUserAction, UserData, fetchDailyReport } from "../utils/api";
+import { Mountain, CheckCircle2, TreePine, History, User, Shield, Tent, Loader2, ClipboardList } from "lucide-react";
+import { ReportItem } from "../types/report";
 
 export default function Home() {
   const [lastScanned, setLastScanned] = useState<{ email: string; action: 'entry' | 'exit'; time: string; userData?: UserData } | null>(null);
   const [message, setMessage] = useState<string>("QRコードをかざしてください");
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [todaysLog, setTodaysLog] = useState<ReportItem[]>([]);
+
+  // Fetch today's log on mount
+  useEffect(() => {
+    loadTodaysLog();
+  }, []);
+
+  const loadTodaysLog = async () => {
+    const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '-');
+    // Note: ensure the date format matches what GAS expects or passes through simple string matching
+    // GAS logic uses YYYY/MM/DD, so let's send that or standard YYYY-MM-DD. 
+    // The updated GAS handles hyphen replacement.
+    const res = await fetchDailyReport(today);
+    if (res.success && res.data) {
+      // Sort by entry time descending (optional)
+      setTodaysLog(res.data.reverse());
+    }
+  };
 
   const handleScan = async (qrData: string) => {
     // Basic validation
@@ -34,12 +52,9 @@ export default function Home() {
 
       const user = query.data;
 
-      // Determine Action: If lastEntry is later than lastExit, they are on the mountain -> Exit.
-      // Otherwise -> Entry.
-
+      // Determine Action
       const entryTime = user.lastEntry ? new Date(user.lastEntry).getTime() : 0;
       const exitTime = user.lastExit ? new Date(user.lastExit).getTime() : 0;
-
       const newAction = entryTime > exitTime ? 'exit' : 'entry';
 
       // 2. Record the action
@@ -63,6 +78,9 @@ export default function Home() {
         setMessage("下山を確認しました。お疲れ様でした！");
       }
 
+      // Refresh the log list
+      loadTodaysLog();
+
     } catch (e: any) {
       console.error(e);
       setIsError(true);
@@ -73,13 +91,13 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-4 relative overflow-hidden text-white">
+    <main className="min-h-screen flex flex-col items-center justify-start p-4 relative overflow-y-auto text-white pb-20">
 
       {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-black/40 to-transparent pointer-events-none" />
 
       {/* Header */}
-      <header className="z-10 mb-8 text-center">
+      <header className="z-10 mb-8 text-center mt-8">
         <div className="flex items-center justify-center gap-2 mb-2">
           <Mountain className="w-10 h-10 text-emerald-400" />
           <h1 className="text-3xl font-bold tracking-wider text-glow">Mount Pass</h1>
@@ -88,8 +106,7 @@ export default function Home() {
       </header>
 
       {/* Main Card */}
-      <div className="z-10 w-full max-w-md glass-panel rounded-3xl p-6 flex flex-col gap-6">
-
+      <div className="z-10 w-full max-w-md glass-panel rounded-3xl p-6 flex flex-col gap-6 mb-8">
         {/* Scanner Area */}
         {isLoading ? (
           <div className="w-full aspect-square flex flex-col items-center justify-center bg-black/20 rounded-2xl border border-white/10 animate-pulse">
@@ -108,8 +125,7 @@ export default function Home() {
 
       {/* Result Card (Rich Data) */}
       {lastScanned && !isLoading && (
-        <div className="z-10 w-full max-w-md mt-6 glass-panel rounded-xl p-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
-
+        <div className="z-10 w-full max-w-md mb-8 glass-panel rounded-xl p-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
           {/* Header Status */}
           <div className="flex items-center gap-4 mb-6 border-b border-white/10 pb-4">
             <div className={`p-3 rounded-full ${lastScanned.action === 'entry' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-blue-500/20 text-blue-400'}`}>
@@ -142,7 +158,7 @@ export default function Home() {
                   <div className="p-2 bg-white/5 rounded-lg"><Shield size={18} className="text-blue-300" /></div>
                   <div>
                     <p className="text-xs opacity-50">保険有効期限</p>
-                    <p className="font-medium">{lastScanned.userData.insuranceExpiry}</p>
+                    <p className="font-medium">{lastScanned.userData.insuranceExpiry || "---"}</p>
                   </div>
                 </div>
 
@@ -150,24 +166,67 @@ export default function Home() {
                   <div className="p-2 bg-white/5 rounded-lg"><Tent size={18} className="text-green-300" /></div>
                   <div>
                     <p className="text-xs opacity-50">機材情報</p>
-                    <p className="font-medium">{lastScanned.userData.equipment}</p>
+                    <p className="font-medium">{lastScanned.userData.equipment || "---"}</p>
                   </div>
                 </div>
               </>
             )}
-
-            <div className="pt-2 text-center">
-              <p className="text-xs text-white/30 truncate">{lastScanned.email}</p>
-            </div>
           </div>
-
         </div>
       )}
 
-      {/* Footer */}
-      <footer className="absolute bottom-4 text-xs text-white/30">
-        Cloud Sync Active &bull; Ver 2.0.0
+      {/* Today's Log Table */}
+      <div className="z-10 w-full max-w-md glass-panel rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-4 px-2">
+          <ClipboardList className="text-white/70" size={20} />
+          <h3 className="font-bold text-lg">本日の記録 ({todaysLog.length}件)</h3>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left opacity-90">
+            <thead className="text-xs text-white/50 border-b border-white/10 uppercase">
+              <tr>
+                <th className="px-2 py-2">氏名</th>
+                <th className="px-2 py-2">入山</th>
+                <th className="px-2 py-2">下山</th>
+                <th className="px-2 py-2 hidden sm:table-cell">エリア</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {todaysLog.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-2 py-4 text-center text-white/30">
+                    本日の記録はありません
+                  </td>
+                </tr>
+              ) : (
+                todaysLog.map((log, index) => (
+                  <tr key={index}>
+                    <td className="px-2 py-3 font-medium">{log.name}</td>
+                    <td className="px-2 py-3 text-emerald-300">{formatTime(log.entryTime)}</td>
+                    <td className="px-2 py-3 text-blue-300">{formatTime(log.exitTime)}</td>
+                    <td className="px-2 py-3 hidden sm:table-cell text-xs opacity-70 truncate max-w-[100px]">{log.registrationArea}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <footer className="mt-8 text-xs text-white/30">
+        Cloud Sync Active &bull; Ver 2.1.0
       </footer>
     </main>
   );
+}
+
+// Helper for time formatting
+function formatTime(val: any) {
+  if (!val) return "-";
+  // If it's a full date string, extract time
+  if (typeof val === 'string' && val.includes('T')) {
+    return new Date(val).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  }
+  return val.toString().slice(0, 5); // Simple slice for HH:mm:ss -> HH:mm if format matches
 }
