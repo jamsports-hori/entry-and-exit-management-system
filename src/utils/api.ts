@@ -5,6 +5,7 @@ export interface UserData {
     memberType: string;
     insuranceExpiry: string;
     equipment: string;
+    color: string;
     lastEntry: string;
     lastExit: string;
 }

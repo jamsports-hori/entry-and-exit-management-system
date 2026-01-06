@@ -184,7 +184,9 @@ function handleUserFetch(email) {
         lastEntry: r[COLUMN_ENTRY_TIME - 1],
         lastExit: r[COLUMN_EXIT_TIME - 1],
         memberType: r[USER_COLS.memberType - 1],
-        // その他の表示用データ...
+        insuranceExpiry: formatIfDate(r[USER_COLS.expiry - 1]),
+        equipment: r[USER_COLS.canopy - 1],
+        color: r[USER_COLS.color - 1]
     };
     return createJsonResponse({ success: true, data: responseData });
 }

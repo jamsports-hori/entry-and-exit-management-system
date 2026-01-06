@@ -158,16 +158,24 @@ export default function Home() {
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/5 rounded-lg"><Shield size={18} className="text-blue-300" /></div>
                   <div>
-                    <p className="text-xs opacity-50">保険有効期限</p>
-                    <p className="font-medium">{lastScanned.userData.insuranceExpiry || "---"}</p>
+                    <p className="text-xs opacity-50">会員登録有効期限</p>
+                    <p className={`font-medium ${lastScanned.action === 'entry' && lastScanned.userData.insuranceExpiry && new Date(lastScanned.userData.insuranceExpiry).getTime() < new Date().setHours(0, 0, 0, 0)
+                      ? 'text-red-500 font-bold'
+                      : ''
+                      }`}>
+                      {lastScanned.userData.insuranceExpiry || "---"}
+                    </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/5 rounded-lg"><Tent size={18} className="text-green-300" /></div>
                   <div>
-                    <p className="text-xs opacity-50">機材情報</p>
-                    <p className="font-medium">{lastScanned.userData.equipment || "---"}</p>
+                    <p className="text-xs opacity-50">機材情報/カラー</p>
+                    <p className="font-medium">
+                      {lastScanned.userData.equipment || "---"}
+                      {lastScanned.userData.color ? ` / ${lastScanned.userData.color}` : ""}
+                    </p>
                   </div>
                 </div>
               </>
