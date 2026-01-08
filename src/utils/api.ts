@@ -36,7 +36,7 @@ export const fetchUserData = async (email: string): Promise<ApiResponse> => {
 // but recently GAS allows simple CORS. If it fails, we might need a workaround (using 'no-cors' assumes success).
 // However, 'no-cors' means we can't read the response JSON.
 // For this implementation, we will try standard cors first.
-export const recordUserAction = async (email: string, action: 'entry' | 'exit'): Promise<ApiResponse> => {
+export const recordUserAction = async (email: string, action: 'entry' | 'exit', flightCount?: number): Promise<ApiResponse> => {
     try {
         // We use sendBeacon or fetch with keepalive for reliability, but standard fetch is fine for now
         const response = await fetch(API_URL, {
@@ -46,7 +46,7 @@ export const recordUserAction = async (email: string, action: 'entry' | 'exit'):
             headers: {
                 "Content-Type": "text/plain;charset=utf-8",
             },
-            body: JSON.stringify({ email, action }),
+            body: JSON.stringify({ email, action, flightCount }),
         });
 
         return await response.json();

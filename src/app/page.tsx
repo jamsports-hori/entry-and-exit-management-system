@@ -3,16 +3,20 @@
 import { useState, useEffect } from "react";
 import { QRScanner } from "../components/Scanner";
 import { fetchUserData, recordUserAction, UserData, fetchDailyReport } from "../utils/api";
-import { Mountain, CheckCircle2, TreePine, History, User, Shield, Tent, Loader2, ClipboardList } from "lucide-react";
+import { Mountain, CheckCircle2, TreePine, History, User, Shield, Tent, Loader2, ClipboardList, Plane } from "lucide-react";
 import { ReportItem } from "../types/report";
 
 export default function Home() {
-  const [viewMode, setViewMode] = useState<'home' | 'scan' | 'result'>('home');
+  const [viewMode, setViewMode] = useState<'home' | 'scan' | 'result' | 'flightInput'>('home');
   const [lastScanned, setLastScanned] = useState<{ email: string; action: 'entry' | 'exit'; time: string; userData?: UserData } | null>(null);
   const [message, setMessage] = useState<string>("QRコードをかざしてください");
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [todaysLog, setTodaysLog] = useState<ReportItem[]>([]);
+
+  // Pending data for flight input flow
+  const [pendingExitData, setPendingExitData] = useState<{ email: string, userData: UserData } | null>(null);
+  const [flightCount, setFlightCount] = useState<number>(0);
 
   // Fetch today's log on mount
   useEffect(() => {
@@ -64,21 +68,43 @@ export default function Home() {
       const exitTime = user.lastExit ? new Date(user.lastExit).getTime() : 0;
       const newAction = entryTime > exitTime ? 'exit' : 'entry';
 
-      setMessage(newAction === 'entry' ? "入山処理中..." : "下山処理中...");
-      const recordResult = await recordUserAction(qrData, newAction);
+      if (newAction === 'exit') {
+        // Stop here and ask for flight count
+        setPendingExitData({ email: qrData, userData: user });
+        setFlightCount(0);
+        setViewMode('flightInput');
+        setIsLoading(false);
+        return;
+      }
+
+      // Entry Action - Proceed immediately
+      setMessage("入山処理中...");
+      await processAction(qrData, 'entry', user);
+
+    } catch (e: any) {
+      console.error(e);
+      setIsError(true);
+      setMessage(e.message || "スプレッドシートへの接続に失敗しました");
+      setIsLoading(false);
+    }
+  };
+
+  const processAction = async (email: string, action: 'entry' | 'exit', user: UserData, flights?: number) => {
+    try {
+      const recordResult = await recordUserAction(email, action, flights);
 
       if (!recordResult.success) {
         throw new Error(recordResult.message);
       }
 
       setLastScanned({
-        email: qrData,
-        action: newAction,
+        email: email,
+        action: action,
         time: new Date().toLocaleString('ja-JP'),
         userData: user
       });
 
-      if (newAction === 'entry') {
+      if (action === 'entry') {
         setMessage("入山を受け付けました。");
       } else {
         setMessage("下山を確認しました。お疲れ様でした！");
@@ -86,15 +112,22 @@ export default function Home() {
 
       loadTodaysLog();
       setViewMode('result');
-
     } catch (e: any) {
       console.error(e);
       setIsError(true);
-      setMessage(e.message || "スプレッドシートへの接続に失敗しました");
-      // Keep in scan mode on error so they can try again, but show error
+      setMessage(e.message || "エラーが発生しました");
+      // If coming from flight input, we might want to stay there or go back to home?
+      // For now, let's go back to home to avoid stuck state
+      if (action === 'exit') setViewMode('home');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleFlightSubmit = () => {
+    if (!pendingExitData) return;
+    setIsLoading(true);
+    processAction(pendingExitData.email, 'exit', pendingExitData.userData, flightCount);
   };
 
   return (
@@ -212,6 +245,39 @@ export default function Home() {
           >
             Cancel
           </button>
+        </div>
+      )}
+
+      {/* FLIGHT INPUT MODE */}
+      {viewMode === 'flightInput' && (
+        <div className="w-full max-w-md flex flex-col gap-6 animate-in zoom-in-95 fade-in duration-500">
+          <div className="glass-panel rounded-3xl p-8 border border-white/10 relative overflow-hidden">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="p-4 bg-blue-500/20 rounded-full mb-2">
+                <Plane size={48} className="text-blue-400" />
+              </div>
+              <h2 className="text-2xl font-bold">本日は何本飛びましたか？</h2>
+
+              <div className="flex items-center justify-center gap-6 my-6 w-full">
+                <button
+                  onClick={() => setFlightCount(Math.max(0, flightCount - 1))}
+                  className="w-16 h-16 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-3xl transition-all"
+                >-</button>
+                <span className="text-6xl font-bold font-mono w-24 text-center">{flightCount}</span>
+                <button
+                  onClick={() => setFlightCount(flightCount + 1)}
+                  className="w-16 h-16 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-3xl transition-all"
+                >+</button>
+              </div>
+
+              <button
+                onClick={handleFlightSubmit}
+                className="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl font-bold text-lg shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] transition-all"
+              >
+                決定 (Complete)
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

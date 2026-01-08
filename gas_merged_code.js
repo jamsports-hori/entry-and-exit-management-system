@@ -1,11 +1,12 @@
 /**
  * =========================================================
- *  入下山管理システム - 完全版統合コード (Ver 4.0 - 行更新対応版)
+ *  入下山管理システム - 完全版統合コード (Ver 4.1 - フライト本数対応版)
  * =========================================================
  * 
  * 変更点:
  * - 下山(exit)時に新しい行を追加するのではなく、その日の入山(entry)行を探して下山時間を書き込みます。
  * - ログシートの列構成をご希望のフォーマットに合わせました。
+ * - 下山時にフライト本数を受け取り、保存する機能を追加。
  */
 
 // ==========================================
@@ -36,7 +37,7 @@ const LOG_SPREADSHEET_ID = "1oj4pE7El7wYKUr0a1M41Zko1qRK0aJL-qHJ8sGb4Kpc"; // �
 const LOG_SHEET_NAME = "LOG"; // ★ログ用シート名
 
 // ログ保存時の列マッピング (希望フォーマット)
-// A:氏名, B:入山, C:下山, D:種別, E:エリア, F:No, G:期限, H:機材, I:色, J:日付(システム用), K:Email(システム用)
+// A:氏名, B:入山, C:下山, D:種別, E:エリア, F:No, G:期限, H:機材, I:色, J:日付(システム用), K:Email(システム用), L:本数
 const LOG_COL_INDEX = {
     NAME: 0,
     ENTRY: 1,
@@ -48,7 +49,8 @@ const LOG_COL_INDEX = {
     CANOPY: 7,
     COLOR: 8,
     DATE: 9,   // J列: 日付 (フィルタ用)
-    EMAIL: 10  // K列: Email (照合用)
+    EMAIL: 10, // K列: Email (照合用)
+    FLIGHT_COUNT: 11 // L列: フライト本数
 };
 
 // ==========================================
@@ -110,6 +112,7 @@ function doPost(e) {
 
     const email = postData.email;
     const action = postData.action;
+    const flightCount = postData.flightCount; // Optional flight count for exit
 
     // 1. 会員情報を取得
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -154,7 +157,7 @@ function doPost(e) {
 
     // 3. ログシート更新 (日報用)
     try {
-        updateLogSheet(email, action, now, memberDetails, shortTimeStr);
+        updateLogSheet(email, action, now, memberDetails, shortTimeStr, flightCount);
     } catch (logErr) {
         console.error(logErr);
     }
@@ -192,7 +195,7 @@ function handleUserFetch(email) {
 }
 
 // --- ログ記録ロジック (行更新) ---
-function updateLogSheet(email, action, dateObj, details, timeStr) {
+function updateLogSheet(email, action, dateObj, details, timeStr, flightCount) {
     // if (LOG_SPREADSHEET_ID === "YOUR_LOG_SPREADSHEET_ID_HERE") return;
 
     const ss = SpreadsheetApp.openById(LOG_SPREADSHEET_ID);
@@ -203,7 +206,7 @@ function updateLogSheet(email, action, dateObj, details, timeStr) {
 
     // 入山 (entry): 新しい行を追加
     if (action === 'entry') {
-        // 列順序: Name, Entry, Exit, Type, Area, No, Expiry, Canopy, Color, Date, Email
+        // 列順序: Name, Entry, Exit, Type, Area, No, Expiry, Canopy, Color, Date, Email, FlightCount
         const newRow = [
             details.name,
             timeStr,    // Entry Time
@@ -215,7 +218,8 @@ function updateLogSheet(email, action, dateObj, details, timeStr) {
             details.canopy,
             details.color,
             todayStr,   // J列: 日付
-            email       // K列: Email
+            email,      // K列: Email
+            ""          // L列: フライト本数
         ];
         sheet.appendRow(newRow);
 
@@ -241,7 +245,7 @@ function updateLogSheet(email, action, dateObj, details, timeStr) {
         // 効率のため、下から上に検索
         // データ量が多い場合は getDisplayValues() で一括取得してからループ推奨
         // ここでは直近の履歴を探すため、下からループします
-        const range = sheet.getRange(2, 1, lastRow - 1, 11); // A列〜K列
+        const range = sheet.getRange(2, 1, lastRow - 1, 12); // A列〜L列
         const values = range.getValues(); // 0-indexed array
 
         let targetRowIndex = -1;
@@ -269,6 +273,10 @@ function updateLogSheet(email, action, dateObj, details, timeStr) {
             // 発見: 行を更新 (行番号 = targetRowIndex + 2)
             // C列 (3列目) に timeStr を書き込み
             sheet.getRange(targetRowIndex + 2, 3).setValue(timeStr);
+            // L列 (12列目) に フライト本数 を書き込み
+            if (flightCount !== undefined && flightCount !== null) {
+                sheet.getRange(targetRowIndex + 2, 12).setValue(flightCount);
+            }
         } else {
             // 対応する入山記録が見つからない場合 (入山忘れ等)
             // 新しい行を追加するか、エラーにするか。ここでは「下山のみ」として行追加します
@@ -283,7 +291,8 @@ function updateLogSheet(email, action, dateObj, details, timeStr) {
                 details.canopy,
                 details.color,
                 todayStr,
-                email
+                email,
+                flightCount || ""
             ];
             sheet.appendRow(newRow);
         }
@@ -304,7 +313,7 @@ function processDailyLog() {
         return; // ヘッダーのみ、またはデータなし
     }
 
-    const range = sheet.getRange(2, 1, lastRow - 1, 11);
+    const range = sheet.getRange(2, 1, lastRow - 1, 12); // L列まで
     const values = range.getValues();
 
     // 2. 重複整理 (入山時間の遅い方を残す)
@@ -338,9 +347,9 @@ function processDailyLog() {
 
     // シートをクリアして書き直し（整理結果のみにする）
     // ※アーカイブ前に整理した状態にする
-    sheet.getRange(2, 1, lastRow - 1, 11).clearContent();
+    sheet.getRange(2, 1, lastRow - 1, 12).clearContent();
     if (cleanedValues.length > 0) {
-        sheet.getRange(2, 1, cleanedValues.length, 11).setValues(cleanedValues);
+        sheet.getRange(2, 1, cleanedValues.length, 12).setValues(cleanedValues);
     } else {
         console.log("No valid records found after cleanup. Skipping archive.");
         return;
@@ -365,11 +374,7 @@ function processDailyLog() {
     // 行削除ではなく内容クリアの方が高速かつ安全
     const currentLastRow = sheet.getLastRow();
     if (currentLastRow >= 2) {
-        sheet.getRange(2, 1, currentLastRow - 1, 11).clear({ contentsOnly: true, formatOnly: false });
-        // ※ formatOnly: false にすると赤字設定なども消えるので、次回の為に書式は残しても良いが
-        //   赤字などの条件付き書式ではない直接設定は残ると面倒なので、書式ごと消すか、
-        //   あるいはデフォルト書式に戻すのがベター。
-        //   ここではシンプルに clear() します。
+        sheet.getRange(2, 1, currentLastRow - 1, 12).clear({ contentsOnly: true, formatOnly: false });
     }
 
     console.log(`Processed daily log. Archived to ${archiveName} and cleared main log.`);
