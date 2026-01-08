@@ -218,6 +218,19 @@ function updateLogSheet(email, action, dateObj, details, timeStr) {
             email       // K列: Email
         ];
         sheet.appendRow(newRow);
+
+        // ★赤字チェック: 期限切れなら該当セルを赤にする
+        // Expiryは G列 (7列目)
+        if (details.expiry) {
+            const expiryDate = new Date(details.expiry);
+            // 時間を無視して日付のみ比較
+            const todayZero = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+            if (expiryDate < todayZero) {
+                const lastRow = sheet.getLastRow();
+                // 7列目(G列)のフォント色を赤に
+                sheet.getRange(lastRow, 7).setFontColor("red").setFontWeight("bold");
+            }
+        }
     }
 
     // 下山 (exit): 同一ユーザー・同一日の「下山時間が空」の行を探して更新
@@ -277,10 +290,104 @@ function updateLogSheet(email, action, dateObj, details, timeStr) {
     }
 }
 
+// --- 日報処理 & アーカイブ (夜間バッチ用) ---
+// トリガー設定: 毎日 23:50〜23:59 頃に実行してください
+function processDailyLog() {
+    const ss = SpreadsheetApp.openById(LOG_SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(LOG_SHEET_NAME);
+    if (!sheet) return;
+
+    // 1. データ取得
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+        console.log("No data to process.");
+        return; // ヘッダーのみ、またはデータなし
+    }
+
+    const range = sheet.getRange(2, 1, lastRow - 1, 11);
+    const values = range.getValues();
+
+    // 2. 重複整理 (入山時間の遅い方を残す)
+    // Key: Email, Value: Row Data
+    const uniqueMap = new Map();
+
+    values.forEach(row => {
+        const email = row[10]; // K列
+        const entryTimeStr = row[1]; // B列
+
+        if (!uniqueMap.has(email)) {
+            uniqueMap.set(email, row);
+        } else {
+            // 既存と比較
+            const existingRow = uniqueMap.get(email);
+            const existingEntry = existingRow[1];
+
+            // 比較用にDate化（文字列比較でもフォーマットがYMDHMSなら概ねOKだが、Date推奨）
+            const d1 = new Date(entryTimeStr).getTime() || 0;
+            const d2 = new Date(existingEntry).getTime() || 0;
+
+            if (d1 > d2) {
+                // 今回の方が新しいので上書き
+                uniqueMap.set(email, row);
+            }
+        }
+    });
+
+    // 整理後のデータ
+    const cleanedValues = Array.from(uniqueMap.values());
+
+    // シートをクリアして書き直し（整理結果のみにする）
+    // ※アーカイブ前に整理した状態にする
+    sheet.getRange(2, 1, lastRow - 1, 11).clearContent();
+    if (cleanedValues.length > 0) {
+        sheet.getRange(2, 1, cleanedValues.length, 11).setValues(cleanedValues);
+    } else {
+        console.log("No valid records found after cleanup. Skipping archive.");
+        return;
+    }
+
+    // 3. アーカイブ (シートコピー)
+    // 今日の日付でシート名を作成
+    const archiveName = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyyMMdd");
+
+    // 同名シートが既にないか確認
+    let archiveSheet = ss.getSheetByName(archiveName);
+    if (archiveSheet) {
+        // 既にある場合は削除するか、連番をつけるか...ここでは削除して作り直す
+        ss.deleteSheet(archiveSheet);
+    }
+
+    // コピー作成
+    const copiedSheet = sheet.copyTo(ss);
+    copiedSheet.setName(archiveName);
+
+    // 4. 元シートのクリア (ヘッダー以外全削除)
+    // 行削除ではなく内容クリアの方が高速かつ安全
+    const currentLastRow = sheet.getLastRow();
+    if (currentLastRow >= 2) {
+        sheet.getRange(2, 1, currentLastRow - 1, 11).clear({ contentsOnly: true, formatOnly: false });
+        // ※ formatOnly: false にすると赤字設定なども消えるので、次回の為に書式は残しても良いが
+        //   赤字などの条件付き書式ではない直接設定は残ると面倒なので、書式ごと消すか、
+        //   あるいはデフォルト書式に戻すのがベター。
+        //   ここではシンプルに clear() します。
+    }
+
+    console.log(`Processed daily log. Archived to ${archiveName} and cleared main log.`);
+}
+
+
 // --- 日報取得ロジック --
 function handleDailyReport(dateStr) {
     // if (LOG_SPREADSHEET_ID === "YOUR_LOG_SPREADSHEET_ID_HERE") return ...
     const ss = SpreadsheetApp.openById(LOG_SPREADSHEET_ID);
+
+    // ★変更: 日報取得機能もアーカイブ対応させる場合
+    // 過去日付なら "yyyyMMdd" シートを見るロジックが必要か？
+    // 現状は "LOG" シート (当日分) または 指定シートを見る必要があるが
+    // ユーザー要望では「当日の」記録を表示とあるので、一旦 LOG シート固定でOK。
+    // もし過去のアーカイブを見たい場合はロジック追加が必要。
+    // 今回は「本日の記録」なので LOG シートでOK。
+
     const sheet = ss.getSheetByName(LOG_SHEET_NAME);
     if (!sheet) return createJsonResponse({ success: false });
 
@@ -294,6 +401,9 @@ function handleDailyReport(dateStr) {
     for (let i = 1; i < data.length; i++) {
         const row = data[i];
         let rowDate = row[9];
+        // 日付セルが空の場合はスキップ
+        if (!rowDate) continue;
+
         if (Object.prototype.toString.call(rowDate) === "[object Date]") {
             rowDate = Utilities.formatDate(rowDate, Session.getScriptTimeZone(), "yyyy/MM/dd");
         }

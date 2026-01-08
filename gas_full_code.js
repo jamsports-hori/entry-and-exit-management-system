@@ -15,13 +15,13 @@
 // ==========================================
 
 // 1. ユーザー情報（会員リスト）があるスプレッドシートのIDとシート名
-const USERS_SPREADSHEET_ID = "YOUR_SPREADSHEET_ID_HERE"; // ★ここにIDを入力
-const USERS_SHEET_NAME = "Users"; // ★会員リストのシート名
+const USERS_SPREADSHEET_ID = "12Ewuu9mylpU7gDhI0kSduV_CAhWDo7Kl0Ix94fZNWXk"; // ★ここにIDを入力
+const USERS_SHEET_NAME = "フォームの回答 1"; // ★会員リストのシート名
 
 // 2. 入下山記録（ログ）を保存する「別のスプレッドシート」のIDとシート名
 //    同じスプレッドシートの場合は USERS_SPREADSHEET_ID と同じIDを入れてください
-const LOGS_SPREADSHEET_ID = "YOUR_LOGS_SPREADSHEET_ID_HERE"; // ★ここにログ用IDを入力
-const LOGS_SHEET_NAME = "Logs"; // ★入下山記録のシート名（例：入山簿）
+const LOGS_SPREADSHEET_ID = "1oj4pE7El7wYKUr0a1M41Zko1qRK0aJL-qHJ8sGb4Kpc"; // ★ここにログ用IDを入力
+const LOGS_SHEET_NAME = "LOG"; // ★入下山記録のシート名（例：入山簿）
 
 
 // ==========================================
