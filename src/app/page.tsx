@@ -163,7 +163,9 @@ export default function Home() {
                         </div>
                         <div className="flex flex-col">
                           <span className="text-sm font-medium text-white/90">{log.name}</span>
-                          <span className="text-[10px] text-white/40">{log.registrationArea}</span>
+                          <span className="text-[10px] text-white/40 truncate max-w-[200px]">
+                            {[log.memberType, log.equipment, log.color].filter(Boolean).join(", ")}
+                          </span>
                         </div>
                       </div>
                       <div className="flex flex-col items-end text-xs font-mono">
